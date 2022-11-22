@@ -1,0 +1,59 @@
+version: '3.7'
+
+services:
+
+  # https://docs.docker.com/compose/startup-order/
+
+  frontend:
+    build:
+      context: ./dockerfiles/frontend/
+      dockerfile: Dockerfile-dev
+    ports:
+      - "3001:5173"
+    volumes:
+      - ./frontend/:/var/www/html/
+    restart: always
+    env_file:
+      - .env
+    depends_on:
+      - backend
+    networks:
+      transcendence-network:
+
+  backend:
+    hostname: backend
+    build:
+      context: ./dockerfiles/backend/
+      dockerfile: Dockerfile-dev
+    ports:
+      - "3000:3000"
+      - "3002:3001" # WebSockets
+    volumes:
+      - ./backend/:/var/www/html/
+    restart: always
+    env_file:
+      - .env
+    depends_on:
+      - database
+    networks:
+      transcendence-network:
+
+  # psql -d transcendence -p 5432 --username=sasso -h localhost
+  database:
+    hostname: database
+    image: postgres
+    restart: always
+    ports:
+      - "5432:5432" # ONLY IN DEV ENVIRONMENT
+    env_file:
+      - .env
+    volumes:
+      - database-volume:/var/lib/postgresql/data/
+    networks:
+      transcendence-network:
+volumes:
+  database-volume:
+
+networks:
+  transcendence-network:
+    driver: bridge

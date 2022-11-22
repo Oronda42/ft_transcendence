@@ -1,0 +1,146 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+datasource db {
+	provider = "postgresql"
+	url      = env("DATABASE_URL")
+}
+
+generator client {
+	provider = "prisma-client-js"
+	binaryTargets = ["native", "linux-musl"]
+}
+
+model User {
+	id               	Int             @default(autoincrement()) @id
+	email            	String
+	phone            	String
+	profilePicture   	String
+	firstName        	String
+	lastName         	String
+	username         	String          @unique
+	login            	String          @unique
+	campus           	String
+	wins             	Int             @default(0)
+	losses           	Int             @default(0)
+	elo              	Int             @default(1000)
+	twoFactorEnabled 	Boolean         @default(false)
+	otpSecret        	String          @default("")
+	otpUri           	String          @default("")
+	isOwner          	Boolean         @default(false)
+	isAdmin          	Boolean         @default(false)
+	status           	Status          @default(OFFLINE)
+
+    userFriends      	Friend[]       @relation(name: "userFriends")
+    friendUsers      	Friend[]       @relation(name: "friendsUser")
+
+    blockingUsers    	BlockedUser[]  @relation(name: "blockingUser")
+    blockedUsers     	BlockedUser[]  @relation(name: "blockedUser")
+
+	participants	 	Participant[]
+	messages		 	Message[]
+
+	matchesWon          Match[]        @relation(name: "playerMatchWon")
+	matchesLost         Match[]        @relation(name: "playerMatchLost")
+
+	notifications		Notification[]
+}
+
+model Message {
+	id        	Int      		@default(autoincrement()) @id
+	content   	String
+	timestamp 	DateTime		@default(now())
+
+	chatRoom  	ChatRoom?   		@relation(fields: [chatId], references: [id])
+	chatId		Int?
+
+	sender		User?		@relation(fields: [senderId], references: [id])
+	senderId	Int?
+
+	// for commands message
+	isStatus	Boolean			@default(false)
+}
+
+model Participant {
+	id				Int			@default(autoincrement()) @id
+	is_owner		Boolean		@default(false)
+	is_admin		Boolean		@default(false)
+	is_moderator	Boolean		@default(false)
+	entered_hash	String		@default("") // hash of the password entered by the user when he join (needkto be check if case of password change)
+
+	chatRoom		ChatRoom?	@relation(fields: [chatId], references: [id]) 
+	chatId			Int?
+
+	user			User?		@relation(fields: [userId], references: [id]) 
+	userId			Int?
+}
+
+model ChatRoom {
+	id					Int		@default(autoincrement()) @id
+	name 				String	@unique
+	is_private			Boolean @default(false)
+	is_protected		Boolean @default(false)
+	hash				String?
+
+	banned				String[] @default([])
+	banned_timestamp	String[] @default([])
+
+	muted				String[] @default([])
+	muted_timestamp		String[] @default([])
+
+	participants Participant[]
+	messages	Message[]
+}
+
+model Notification {
+	id			Int		@default(autoincrement()) @id
+
+	sender		User?	@relation(fields: [senderId], references: [id])
+	senderId	Int?
+
+	service		String	// chat, match, friend, etc 
+	link		String?	// link to the service (goto(link))
+	title		String	// title of the notification
+	content		String	// content of the notification
+}
+
+enum Status {
+    ONLINE
+    OFFLINE
+    IN_GAME
+}
+
+model Friend {
+    login       String
+    friendLogin String
+    Users       User     @relation(name: "userFriends", fields: [login], references: [login])
+    Friends     User     @relation(name: "friendsUser", fields: [friendLogin], references: [login])
+    pending     Boolean  @default(true)
+
+    @@id([login, friendLogin])
+}
+
+model BlockedUser {
+    login         String
+    blockedLogin  String
+    Users         User     @relation(name: "blockingUser", fields: [login], references: [login])
+    Friends       User     @relation(name: "blockedUser", fields: [blockedLogin], references: [login])
+
+    @@id([login, blockedLogin])
+}
+
+model Match {
+    id           Int       @default(autoincrement()) @id
+
+    winnerLogin  String
+    loserLogin   String
+
+    // We should use OR (https://www.prisma.io/docs/reference/api-reference/prisma-client-reference#or) when finding players
+    winner       User      @relation(name: "playerMatchWon", fields: [winnerLogin], references: [login])
+    loser        User      @relation(name: "playerMatchLost", fields: [loserLogin], references: [login])
+
+    winnerScore  Int
+    loserScore   Int
+
+    timestamp	 DateTime  @default(now())
+}
